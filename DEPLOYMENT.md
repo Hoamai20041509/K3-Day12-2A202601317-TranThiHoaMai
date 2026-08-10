@@ -1,101 +1,69 @@
 # Thông Tin Deploy — Checkpoint 5
 
-> Điền file này sau khi deploy xong. `pytest tests/test_cp5.py` đọc file này
-> để tìm địa chỉ service của bạn và gọi thử.
->
-> **Chỉ ghi TÊN biến môi trường, tuyệt đối không dán giá trị API key vào đây.**
-> Repo này công khai — dán khóa vào là mất khóa.
+> Bài lab đang dùng phương án local fallback được quy định trong hướng dẫn.
+> Không có giá trị bí mật nào được lưu trong tài liệu này.
 
 ## Thông Tin Học Viên
 
 | Mục | Nội dung |
 |-----|----------|
-| Họ và tên | (điền họ tên) |
-| Mã học viên | (điền mã học viên) |
-| Repo | (điền link repo DAY12-...) |
+| Họ và tên | Trần Thị Hoa Mai |
+| Mã học viên | 2A202601317 |
+| Repo | https://github.com/Hoamai20041509/K3-Day12-2A202601317-TranThiHoaMai |
 
 ## Service
 
 | Mục | Nội dung |
 |-----|----------|
-| Public URL | https://TODO-thay-bang-url-that.up.railway.app |
-| Platform | Railway / Render / Cloud Run — (điền platform bạn dùng) |
-| Ngày deploy | (điền ngày) |
+| Địa chỉ kiểm tra | http://localhost:8001 |
+| Platform | Local Docker Compose fallback; cloud platform dự kiến: Railway |
+| Ngày kiểm tra | 2026-08-10 |
 
-## Biến Môi Trường Đã Set Trên Cloud
+## Biến Môi Trường
 
-Ghi tên biến và **nguồn giá trị**, không ghi giá trị:
+Chỉ liệt kê tên biến và nguồn cấu hình, không ghi giá trị bí mật.
 
-| Biến | Đã set | Ghi chú |
-|------|--------|---------|
-| `PORT` | ✅ | platform tự gán |
-| `AGENT_API_KEY` | ✅ | đặt trong dashboard, không nằm trong repo |
-| `REDIS_URL` | ✅ | (điền: Redis add-on của platform / Upstash / ...) |
-| `RATE_LIMIT_PER_MINUTE` | ✅ | 10 |
-| `MONTHLY_BUDGET_USD` | ✅ | 10.0 |
-| `LOG_LEVEL` | ✅ | INFO |
-
-## Lệnh Kiểm Tra
-
-Thay `<URL>` bằng Public URL ở trên:
-
-```bash
-# 1. Liveness — mong đợi 200 {"status":"ok"}
-curl -i <URL>/health
-
-# 2. Readiness — mong đợi 200 {"status":"ready"} (đã nối được Redis)
-curl -i <URL>/ready
-
-# 3. Không có API key — mong đợi 401
-curl -i -X POST <URL>/ask \
-  -H "Content-Type: application/json" \
-  -d '{"question":"Hello"}'
-
-# 4. Có API key — mong đợi 200 kèm câu trả lời
-curl -i -X POST <URL>/ask \
-  -H "Content-Type: application/json" \
-  -H "X-API-Key: $AGENT_API_KEY" \
-  -H "X-User-Id: sv-test" \
-  -d '{"question":"Deploy là gì?"}'
-
-# 5. Rate limit — gọi 15 lần, những lần cuối phải trả 429
-for i in $(seq 1 15); do
-  curl -s -o /dev/null -w "%{http_code} " -X POST <URL>/ask \
-    -H "Content-Type: application/json" \
-    -H "X-API-Key: $AGENT_API_KEY" \
-    -H "X-User-Id: sv-test" \
-    -d '{"question":"test"}'
-done; echo
-```
+| Biến | Đã set | Nguồn |
+|------|--------|-------|
+| `PORT` | Có | Docker Compose |
+| `AGENT_API_KEY` | Có | File `.env` không được Git theo dõi |
+| `REDIS_URL` | Có | Docker Compose, trỏ tới service Redis |
+| `RATE_LIMIT_PER_MINUTE` | Có | File `.env` / Docker Compose |
+| `MONTHLY_BUDGET_USD` | Có | File `.env` / Docker Compose |
+| `LOG_LEVEL` | Có | File `.env` / Docker Compose |
+| `LOCAL_FALLBACK` | Có | File `.env` không được Git theo dõi |
 
 ## Kết Quả Chạy Thật
 
-Dán output của các lệnh trên vào đây:
+Stack được khởi động bằng `docker compose up -d --build --wait`.
 
+```text
+agent: Up (healthy), cổng 8001:8001
+redis: Up (healthy), cổng 6379:6379
+
+GET  http://localhost:8001/health -> 200
+{"status":"ok","service":"day12-agent","version":"1.0.0"}
+
+GET  http://localhost:8001/ready -> 200
+{"status":"ready","redis":true}
+
+POST http://localhost:8001/ask (không có X-API-Key) -> 401
+{"detail":"invalid or missing API key"}
 ```
-(điền output)
+
+Docker image production:
+
+```text
+Repository=day12-agent Tag=prod Size=270MB
 ```
 
-## Ảnh Chụp Màn Hình
+## Ảnh Chụp
 
-Đặt ảnh trong thư mục `screenshots/`:
+- `screenshots/health.png`: ảnh chụp endpoint `/health` đang phục vụ từ container.
 
-- `screenshots/dashboard.png` — trang quản lý service trên platform
-- `screenshots/health.png` — kết quả gọi `/health` từ trình duyệt hoặc curl
+## Lý Do Dùng Phương Án Dự Phòng
 
----
-
-## Nếu Dùng Phương Án Dự Phòng
-
-Không đăng ký được tài khoản cloud? Vẫn nộp được bài, nhưng CP5 tối đa 60% điểm:
-
-1. Đặt `LOCAL_FALLBACK=true` trong `.env`
-2. Chạy `docker compose up -d` rồi kiểm tra `docker compose ps`
-3. Chụp màn hình vào `screenshots/`
-4. Chạy `pytest tests/test_cp5.py -v` — bộ test sẽ tự chuyển sang kiểm tra
-   `http://localhost:8000`
-5. Ghi rõ lý do không deploy được vào phần dưới đây:
-
-```
-(điền lý do nếu dùng phương án dự phòng, ngược lại xóa mục này)
-```
+Phiên làm việc không có thông tin đăng nhập hoặc ủy quyền tạo tài nguyên trên
+nền tảng cloud. Vì vậy bài được kiểm tra bằng Docker Compose local theo phương
+án fallback trong hướng dẫn. Khi có tài khoản Railway, cần deploy image này,
+gắn Redis add-on và thay địa chỉ local bằng Public URL HTTPS thật.
